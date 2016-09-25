@@ -20,6 +20,7 @@ enum Action {
     Yank,
     Delete,
     Global(Box<Action>),
+    Edit(String),
     Go,
     Print,
 }
@@ -97,6 +98,10 @@ fn parse_action<'a>(input: &'a str) -> (Action, &'a str) {
         Some('y') => (Action::Yank, input.split_at(1).1),
         Some('p') => (Action::Print, input.split_at(1).1),
         Some('d') => (Action::Delete, input.split_at(1).1),
+        Some('e') => {
+            let (filename, input) = parse_filename(input.split_at(1).1);
+            (Action::Edit(filename), input)
+        },
         Some('g') => {
             let (inner_action, input) = parse_action(input.split_at(1).1);
             (Action::Global(Box::new(inner_action)), input)
@@ -106,6 +111,13 @@ fn parse_action<'a>(input: &'a str) -> (Action, &'a str) {
     }
 }
 
+fn parse_filename<'a>(input: &'a str) -> (String, &'a str) {
+    let mut input = input;
+    while input.chars().nth(0) == Some(' ') {
+        input = input.split_at(1).1;
+    }
+    (input.to_string(), "")
+}
 #[cfg(tests)]
 mod tests {
     #[test]
