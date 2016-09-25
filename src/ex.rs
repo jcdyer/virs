@@ -1,5 +1,5 @@
-#[derive(Debug)]
-enum Locator {
+#[derive(Debug,PartialEq)]
+pub enum Locator {
     Last,
     Here,
     All,
@@ -8,15 +8,15 @@ enum Locator {
     Line(u64),
 }
 
-#[derive(Debug)]
-struct Selector {
+#[derive(Debug,PartialEq)]
+pub struct Selector {
     start: Locator,
     end: Option<Locator>,
 
 }
 
-#[derive(Debug)]
-enum Action {
+#[derive(Debug,PartialEq)]
+pub enum Action {
     Yank,
     Delete,
     Global(Box<Action>),
@@ -25,7 +25,7 @@ enum Action {
     Print,
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub struct Command {
     string: String,
     selector: Selector,
@@ -118,8 +118,11 @@ fn parse_filename<'a>(input: &'a str) -> (String, &'a str) {
     }
     (input.to_string(), "")
 }
-#[cfg(tests)]
+
+#[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_parse_here_print() {
         let command = parse_command(".p");
