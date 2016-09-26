@@ -1,40 +1,8 @@
-#[derive(Debug,PartialEq)]
-pub enum Locator {
-    Last,
-    Here,
-    All,
-    Ahead(u64),
-    Back(u64),
-    Line(u64),
-}
-
-#[derive(Debug,PartialEq)]
-pub struct Selector {
-    start: Locator,
-    end: Option<Locator>,
-
-}
-
-#[derive(Debug,PartialEq)]
-pub enum Action {
-    Yank,
-    Delete,
-    Global(Box<Action>),
-    Edit(String),
-    Go,
-    Print,
-}
-
-#[derive(Debug,PartialEq)]
-pub struct Command {
-    string: String,
-    selector: Selector,
-    action: Action,
-}
+use super::{Command, Selector, Locator, Action};
 
 pub fn parse_command<'a>(input: &'a str) -> Command {
     let command_str = input.to_string();
-    
+
     let (range, input) = parse_range(input);
     let (action, input) = parse_action(input);
     if input != "" {
@@ -46,7 +14,7 @@ pub fn parse_command<'a>(input: &'a str) -> Command {
         action: action
     }
 }
-    
+
 fn parse_range<'a>(input: &'a str) -> (Selector, &'a str) {
     let (start, input) = parse_locator(input);
     (Selector { start: start, end: None }, input)
@@ -98,6 +66,7 @@ fn parse_action<'a>(input: &'a str) -> (Action, &'a str) {
         Some('y') => (Action::Yank, input.split_at(1).1),
         Some('p') => (Action::Print, input.split_at(1).1),
         Some('d') => (Action::Delete, input.split_at(1).1),
+        Some('a') => (Action::Append, input.split_at(1).1),
         Some('e') => {
             let (filename, input) = parse_filename(input.split_at(1).1);
             (Action::Edit(filename), input)
@@ -122,6 +91,7 @@ fn parse_filename<'a>(input: &'a str) -> (String, &'a str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::{Command, Selector, Locator, Action};
 
     #[test]
     fn test_parse_here_print() {

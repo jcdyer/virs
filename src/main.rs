@@ -1,8 +1,9 @@
 use std::io;
 use std::io::Write;
+use ex::parser;
 
-mod ex;
-mod buffer;
+pub mod ex;
+pub mod buffer;
 
 fn main() {
     loop {
@@ -19,7 +20,7 @@ fn main() {
             Ok(_) => {},
             Err(_) => continue,
         };
-        let command = ex::parse_command(command_string.trim());
+        let command = parser::parse_command(command_string.trim());
         println!("{:?}", command);
     }
 }
