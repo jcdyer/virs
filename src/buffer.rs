@@ -5,18 +5,18 @@ use std::fs::File;
 
 #[derive(Debug,PartialEq)]
 pub struct Buffer {
-    filename: Option<String>,
-    content: Vec<String>,
+    pub filename: Option<String>,
+    pub content: Vec<String>,
 }
 
 
 impl Buffer {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Buffer { filename: None, content: vec![] }
     }
 
-    fn open(filename: &str) -> io::Result<Self> {
-        // TODO: 
+    pub fn open(filename: &str) -> io::Result<Self> {
+        // TODO:
         // * Handle opening a new file
         // * Handle file permissions
         let mut file = try!(File::open(filename));
@@ -26,7 +26,7 @@ impl Buffer {
         Ok(Buffer { filename: Some(filename.to_string()), content: lines })
     }
 
-    fn write(&self, filename: Option<&str>) -> io::Result<()> {
+    pub fn write(&self, filename: Option<&str>) -> io::Result<()> {
         let filename = match filename {
             Some(filename) => filename,
             None => match self.filename {
