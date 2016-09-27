@@ -12,8 +12,8 @@ pub enum Locator {
 
 #[derive(Debug,PartialEq)]
 pub struct Selector {
-    start: Locator,
-    end: Option<Locator>,
+    pub start: Locator,
+    pub end: Option<Locator>,
 
 }
 
@@ -26,11 +26,12 @@ pub enum Action {
     Go,
     Print,
     Append,
+    Quit,
 }
 
 #[derive(Debug,PartialEq)]
 pub struct Command {
-    string: String,
-    selector: Selector,
-    action: Action,
+    pub string: String,
+    pub selector: Selector,
+    pub action: Action,
 }

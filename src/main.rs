@@ -2,10 +2,16 @@ use std::io;
 use std::io::Write;
 use ex::parser;
 
+pub mod engine;
 pub mod ex;
 pub mod buffer;
 
 fn main() {
+    let mut engine = engine::Engine::new();
+    engine.buffer = match buffer::Buffer::open("src/main.rs") {
+        Ok(buffer) => buffer,
+        Err(error) => panic!(error),
+    };
     loop {
         match io::stdout().write(":".as_bytes()) {
             Ok(_) => {},
@@ -22,5 +28,9 @@ fn main() {
         };
         let command = parser::parse_command(command_string.trim());
         println!("{:?}", command);
+        match engine.execute(command) {
+            Ok(()) => {},
+            Err(string) => println!("{}", string),
+        }
     }
 }
