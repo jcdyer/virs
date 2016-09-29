@@ -1,104 +1,188 @@
+use nom;
+use nom::{IResult, ErrorKind, digit, eof};
+use nom::IResult::{Done, Error};
 use super::{Command, Selector, Locator, Action};
+use self::utils::*;
 
-pub fn parse_command<'a>(input: &'a str) -> Command {
-    let command_str = input.to_string();
+mod utils {
+    use nom;
+    use nom::{IResult, ErrorKind};
+    use nom::IResult::{Done, Incomplete, Error};
 
-    let (selector, input) = parse_selector(input);
-    let (action, input) = parse_action(input);
-    if input != "" {
-        println!("Extra input: {:?}", input);
-    };
-    Command {
-        string: command_str,
-        selector: selector,
-        action: action
+    pub fn tag_str<'a>(input: &'a str, tag: &'static str) -> IResult<&'a str, &'a str> {
+        let taglen = tag.len();
+        if input.len() < taglen {
+            Error(nom::Err::Position(ErrorKind::Tag, input))
+        } else {
+            let (prefix, remainder) = input.split_at(taglen);
+            if prefix == tag {
+                Done(remainder, prefix)
+            } else {
+                Error(nom::Err::Position(ErrorKind::Tag, input))
+            }
+        }
     }
-}
 
-fn parse_selector<'a>(input: &'a str) -> (Selector, &'a str) {
-    let (start, input) = parse_locator(input);
-    let (optend, input) = if input.chars().nth(0) == Some(',') {
-        let (end, input) = parse_locator(input.split_at(1).1);
-        (Some(end), input)
-    } else {
-        (None, input)
-    };
-    (Selector { start: start, end: optend }, input)
-}
-
-fn parse_locator<'a>(input: &'a str) -> (Locator, &'a str) {
-    match input.chars().nth(0) {
-        Some('.') => (Locator::Here, input.split_at(1).1),
-        Some('%') => (Locator::All, input.split_at(1).1),
-        Some('$') => (Locator::Last, input.split_at(1).1),
-        Some('+') => {
-            let (distance, input) = parse_integer(input.split_at(1).1);
-            (Locator::Ahead(distance), input)
-        },
-        Some('-') => {
-            let (distance, input) = parse_integer(input.split_at(1).1);
-            (Locator::Back(distance), input)
-        },
-        Some('0' ... '9') => {
-            let (lineno, input) = parse_integer(input);
-            (Locator::Line(lineno), input)
-        },
-        _ => (Locator::Here, input),
-    }
-}
-
-fn parse_integer<'a>(input: &'a str) -> (u64, &'a str) {
-    let mut input: &str = input;
-    let mut buf = String::with_capacity(8);
-    loop {
-        // TODO: This is broken.
-        match input.chars().nth(0) {
-            Some(x) => match x {
-                '0' ... '9' => {
-                    buf.push(x);
-                    input = input.split_at(1).1;
-                },
-                _ => break,
+    pub fn map_result<I, O, F, N, E>(ires: IResult<I, O>, f: F) -> IResult<I, N>
+        where F : Fn(O) -> Result<N, E> {
+        match ires {
+            Done(input, output) => {
+                match f(output) {
+                    Ok(result) => Done(input, result),
+                    Err(_) => Error(
+                        nom::Err::Position(ErrorKind::Digit, input)
+                    ),
+                }
             },
-            None => break,
-        };
-    };
-    let i = u64::from_str_radix(&buf, 10).ok().unwrap();
-    (i, input)
+            Error(e) => Error(e),
+            Incomplete(i) => Incomplete(i),
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use nom;
+        use nom::{ErrorKind};
+        use nom::IResult::{Done, Error};
+
+        #[test]
+        fn match_tag_str() {
+            assert_eq!(tag_str("abc", "a"), Done("bc", "a"));
+            assert_eq!(tag_str("abc", "ab"), Done("c", "ab"));
+            assert_eq!(tag_str("abc", "abc"), Done("", "abc"));
+            assert_eq!(tag_str("abc", ""), Done("abc", ""));
+        }
+
+        #[test]
+        fn nomatch_tag_str() {
+            assert_eq!(tag_str("abc", "b"), Error(nom::Err::Position(ErrorKind::Tag, "abc")));
+            assert_eq!(tag_str("abc", "abe"), Error(nom::Err::Position(ErrorKind::Tag, "abc")));
+            assert_eq!(tag_str("abcd", "abcderian"), Error(nom::Err::Position(ErrorKind::Tag, "abcd")));
+        }
+
+        #[test]
+        fn tag_str_against_empty() {
+            assert_eq!(tag_str("", "a"), Error(nom::Err::Position(ErrorKind::Tag, "")));
+        }
+    }
 }
 
-fn parse_action<'a>(input: &'a str) -> (Action, &'a str) {
+pub fn parse_command<'a>(input: &'a str) -> IResult<&str, Command> {
+    tuple!(input, parse_selector , parse_action, eof).map(|(selector, action, _)| {
+        Command { string: input.to_string(), selector: selector, action: action }
+    })
+}
+
+fn parse_selector(input: &str) -> IResult<&str, Selector> {
+    let (input, start) = parse_locator(input).unwrap();
+    let (input, optend) = if input.chars().nth(0) == Some(',') {
+        let (input, end) = parse_locator(input.split_at(1).1).unwrap();
+        (input, Some(end))
+    } else {
+        (input, None)
+    };
+    Done(input, Selector { start: start, end: optend })
+}
+
+fn action_quit(input: &str) -> IResult<&str, Action> {
+    tag_str(input, "q").map(|_| { Action::Quit })
+}
+fn action_yank(input: &str) -> IResult<&str, Action> {
+    tag_str(input, "y").map(|_| { Action::Yank })
+}
+fn action_print(input: &str) -> IResult<&str, Action> {
+    tag_str(input, "p").map(|_| { Action::Print })
+}
+fn action_delete(input: &str) -> IResult<&str, Action> {
+    tag_str(input, "d").map(|_| { Action::Delete })
+}
+fn action_append(input: &str) -> IResult<&str, Action> {
+    tag_str(input, "a").map(|_| { Action::Append })
+}
+fn action_edit(input: &str) -> IResult<&str, Action> {
+    match tag_str(input, "e") {
+        Done(input, _) => parse_filename(input).map(|filename| { Action::Edit(filename) }),
+        IResult::Incomplete(x) => IResult::Incomplete(x),
+        Error(x) => IResult::Error(x),
+    }
+}
+fn action_go(input: &str) -> IResult<&str, Action> {
+    eof(input).map(|_| { Action::Go })
+}
+
+fn action_unknown(input: &str) -> IResult<&str, Action> {
+    Error(nom::Err::Position(ErrorKind::Tag, input))
+}
+
+fn parse_action(input: &str) -> IResult<&str, Action> {
+    alt!(input, action_quit|action_yank|action_print|action_delete|action_append|action_edit|action_go|action_unknown)
+
+    /*
     match input.chars().nth(0) {
-        None => (Action::Go, input),
-        Some('q') => (Action::Quit, input.split_at(1).1),
-        Some('y') => (Action::Yank, input.split_at(1).1),
-        Some('p') => (Action::Print, input.split_at(1).1),
-        Some('d') => (Action::Delete, input.split_at(1).1),
-        Some('a') => (Action::Append, input.split_at(1).1),
+        None => Done(input, Action::Go),
+        Some('q') => action_quit(input),
+        Some('y') => action_yank(input),
+        Some('p') => action_print(input),
+        Some('d') => action_delete(input),
+        Some('a') => action_append(input),
         Some('e') => {
-            let (filename, input) = parse_filename(input.split_at(1).1);
-            (Action::Edit(filename), input)
+            parse_filename(input.split_at(1).1).map(
+                |filename| { Action::Edit(filename) }
+            )
         },
         Some('g') => {
-            let (inner_action, input) = parse_action(input.split_at(1).1);
-            (Action::Global(Box::new(inner_action)), input)
+            parse_action(input.split_at(1).1).map(|inner_action| {
+                Action::Global(Box::new(inner_action))
+            })
         },
-        Some(_) => panic!("Unknown action"),
+        Some(_) => panic!("Unknown action"),  // Unknown action
+    }
+    */
+}
+
+fn parse_locator(input: &str) -> IResult<&str, Locator> {
+    match input.chars().nth(0) {
+        Some('.') => Done(input.split_at(1).1, Locator::Here),
+        Some('%') => Done(input.split_at(1).1, Locator::All),
+        Some('$') => Done(input.split_at(1).1, Locator::Last),
+        Some('+') => {
+            parse_u64(input.split_at(1).1).map(|distance| {
+                Locator::Ahead(distance)
+            })
+        },
+        Some('-') => {
+            parse_u64(input.split_at(1).1).map(|distance| {
+                Locator::Back(distance)
+            })
+        },
+        Some('0' ... '9') => {
+            parse_u64(input).map(|lineno| {
+                Locator::Line(lineno)
+            })
+        },
+        _ => Done(input, Locator::Here),
     }
 }
 
-fn parse_filename<'a>(input: &'a str) -> (String, &'a str) {
+fn parse_u64(input: &str) -> IResult<&str, u64> {
+   // TODO: Handle too-large integers
+   map_result(digit(input), |o|{o.parse()})
+}
+
+fn parse_filename<'a>(input: &'a str) -> IResult<&'a str, String> {
     let mut input = input;
     while input.chars().nth(0) == Some(' ') {
         input = input.split_at(1).1;
     }
-    (input.to_string(), "")
+    Done("", input.to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use super::super::{Command, Selector, Locator, Action};
+    use nom::IResult::Done;
 
     fn assert_command_equal(cmd_string: &str, selector: Selector, action: Action) {
         let cmd = parse_command(cmd_string);
@@ -107,7 +191,7 @@ mod tests {
             selector: selector,
             action: action,
         };
-        assert_eq!(cmd, expected_result);
+        assert_eq!(cmd, Done("", expected_result));
     }
 
     #[test]
@@ -121,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn lineno_go() {
+    fn line_go() {
         assert_command_equal("14", Selector {start: Locator::Line(14), end: None}, Action::Go);
     }
 
@@ -139,6 +223,20 @@ mod tests {
         assert_command_equal(
             "-3,+0y",
             Selector {start: Locator::Back(3), end: Some(Locator::Ahead(0))},
+            Action::Yank,
+        );
+    }
+
+    // TODO: Handle this failure gracefully.
+    #[test]
+    #[should_panic(expected="unwrap() called on an IResult that is Error")]
+    fn too_large_line() {
+        assert_command_equal(
+            "999999999999999999999999999999999999y",
+            Selector {
+                start: Locator::Line(3),
+                end: None,
+            },
             Action::Yank,
         );
     }

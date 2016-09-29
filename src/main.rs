@@ -1,6 +1,10 @@
+#[macro_use]
+extern crate nom;
+
 use std::io;
 use std::io::Write;
 use ex::parser;
+use nom::IResult::{Done, Incomplete, Error};
 
 pub mod engine;
 pub mod ex;
@@ -26,11 +30,20 @@ fn main() {
             Ok(_) => {},
             Err(_) => continue,
         };
-        let command = parser::parse_command(command_string.trim());
-        println!("{:?}", command);
-        match engine.execute(command) {
-            Ok(()) => {},
-            Err(string) => println!("{}", string),
+        match parser::parse_command(command_string.trim()) {
+            Done("", command) => {
+                println!("{:?}", command);
+                match engine.execute(command) {
+                    Ok(()) => {},
+                    Err(string) => println!("{}", string),
+                }
+            },
+            Done(extra, command) => {
+                println!("Invalid command: {}. Extra characters found at the end: {}", command.string, extra)
+            },
+            Error(err) => println!("{:?}", err),
+            Incomplete(_) => panic!("Should not receive incomplete"),
         }
+
     }
 }
