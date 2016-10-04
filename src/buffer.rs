@@ -7,12 +7,13 @@ use std::fs::File;
 pub struct Buffer {
     pub filename: Option<String>,
     pub content: Vec<String>,
+    pub top_visible: usize,
 }
 
 
 impl Buffer {
     pub fn new() -> Self {
-        Buffer { filename: None, content: vec![] }
+        Buffer { filename: None, content: vec![], top_visible: 0 }
     }
 
     pub fn open(filename: &str) -> io::Result<Self> {
@@ -23,7 +24,7 @@ impl Buffer {
         let mut buf = String::new();
         try!(file.read_to_string(&mut buf));
         let lines: Vec<String> = buf.lines().map(|x|{ x.to_string() }).collect();
-        Ok(Buffer { filename: Some(filename.to_string()), content: lines })
+        Ok(Buffer { filename: Some(filename.to_string()), content: lines, top_visible: 0 })
     }
 
     pub fn write(&self, filename: Option<&str>) -> io::Result<()> {
@@ -51,7 +52,7 @@ mod tests {
     fn new_buffer() {
         assert_eq!(
             Buffer::new(),
-            Buffer { filename: None, content: vec![] }
+            Buffer { filename: None, content: vec![], top_visible: 0 }
         );
     }
 

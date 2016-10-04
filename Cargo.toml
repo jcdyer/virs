@@ -5,3 +5,4 @@ authors = ["J. Cliff Dyer <jcd@sdf.org>"]
 
 [dependencies]
 nom = "*"
+rustbox = "*"

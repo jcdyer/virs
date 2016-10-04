@@ -1,29 +1,38 @@
 use buffer;
 use ex;
-use std::process;
 use std::io::{self, Write};
+use display::IO;
 
-pub struct Engine {
+pub enum Mode {
+    Ex,
+    Normal,
+}
+
+pub struct Engine<'a> {
     pub buffer: buffer::Buffer,
     pub cursor: CursorLocator,
     pub clipboard: String,
+    pub io: &'a mut IO,
+    pub mode: Mode,
 }
 
 pub struct CursorLocator {
-    line: u64,
-    col: u64
+    pub line: u64,
+    pub col: u64,
 }
 
-impl Engine {
-    pub fn new() -> Self {
+impl <'a> Engine<'a> {
+    pub fn new(io: &'a mut IO) -> Self {
         Engine {
             buffer: buffer::Buffer::new(),
             cursor: CursorLocator::new(),
             clipboard: String::new(),
+            io: io,
+            mode: Mode::Normal,
         }
     }
 
-    pub fn execute(&mut self, command: ex::Command) -> Result<(), String> {
+    pub fn execute(&mut self, command: &ex::Command) -> Result<bool, String> {
         let range = self.get_selection(&command.selector);
         match command.action {
             ex::Action::Edit(ref filename) => self.execute_edit(range, filename),
@@ -61,27 +70,28 @@ impl Engine {
     }
 
 
-    fn execute_edit(&mut self, range: (u64, Option<u64>), filename: &str) -> Result<(), String> {
+    fn execute_edit(&mut self, range: (u64, Option<u64>), filename: &str) -> Result<bool, String> {
         match buffer::Buffer::open(filename) {
-            Ok(buffer) => { 
+            Ok(buffer) => {
                 self.buffer = buffer;
                 self.cursor = CursorLocator::new();
-                Ok(())
+                self.io.show_buffer(&self.buffer, self);
+                Ok(true)
             },
             Err(_) => Err(format!("Could not open specified file: {}", filename))
         }
     }
 
-    fn execute_go(&mut self, range: (u64, Option<u64>)) -> Result<(), String> {
+    fn execute_go(&mut self, range: (u64, Option<u64>)) -> Result<bool, String> {
         let line = match range.1 {
             Some(x) => x,
             None => range.0,
         };
         self.cursor = CursorLocator { line: line, col: 1 };
-        Ok(())
+        Ok(true)
     }
 
-    fn execute_yank(&mut self, range: (u64, Option<u64>)) -> Result<(), String> {
+    fn execute_yank(&mut self, range: (u64, Option<u64>)) -> Result<bool, String> {
         let mut yanked = String::new();
         let end = match range.1 {
             Some(x) => x,
@@ -93,10 +103,10 @@ impl Engine {
             yanked.push('\n');
         }
         self.clipboard = yanked;
-        Ok(())
+        Ok(true)
     }
 
-    fn execute_print(&self, range: (u64, Option<u64>)) -> Result<(), String> {
+    fn execute_print(&self, range: (u64, Option<u64>)) -> Result<bool, String> {
         let end = match range.1 {
             Some(x) => x,
             None => range.0,
@@ -106,14 +116,14 @@ impl Engine {
             let output = format!("{} {}\n", line, &self.buffer.content[offset]);
             io::stdout().write(output.as_bytes()).ok();
         };
-        Ok(())
+        Ok(true)
     }
 
-    fn execute_quit(&self) -> Result<(), String> {
-        process::exit(0);
+    fn execute_quit(&self) -> Result<bool, String> {
+        Ok(false)
     }
 
-    fn execute_unknown(&self, command: ex::Command) -> Result<(), String> {
+    fn execute_unknown(&self, command: &ex::Command) -> Result<bool, String> {
         Err(format!("Unknown command {:?}", command))
     }
 }
@@ -128,17 +138,19 @@ impl CursorLocator {
 mod tests {
     use ex;
     use super::*;
+    use display;
 
     #[test]
     fn execute_yank() {
-        let mut engine = Engine::new();
+        let mut io = display::IO::new().unwrap();
+        let mut engine = Engine::new(&mut io);
         engine.buffer.content.push("First line.".to_string());
         let cmd = ex::Command {
             string: "1y".to_string(),
             action: ex::Action::Yank,
             selector: ex::Selector { start: ex::Locator::Line(1), end: None },
         };
-        match engine.execute(cmd) {
+        match engine.execute(&cmd) {
             Ok(_) => assert_eq!(&engine.clipboard, "First line.\n"),
             Err(e) => panic!(e),
         };
