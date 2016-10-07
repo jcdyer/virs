@@ -10,7 +10,7 @@ use std::time;
 use rustbox::Key;
 use nom::IResult::{Done, Incomplete, Error};
 
-use ex::parser;
+use ex::{Action, parser};
 
 pub mod display;
 pub mod engine;
@@ -43,16 +43,15 @@ fn main() {
             Ok(rustbox::Event::KeyEvent(rustbox::Key::Char('q'))) => break,
             Ok(rustbox::Event::KeyEvent(rustbox::Key::Char(x))) => {
                 engine.io.set_status(
-                    &format!("{}: Only normal mode implemented. Press ':' to enter commands or 'q' to quit", x)
+                    &format!("{}: Only ex mode implemented. Press ':' to enter commands or 'q' to quit", x)
                 );
                 None
             },
             Ok(_) => {
-                engine.io.set_status("Only normal mode implemented. Press ':' to enter commands or 'q' to quit");
+                engine.io.set_status("Only ex mode implemented. Press ':' to enter commands or 'q' to quit");
                 None
             },
             _ => continue,
-
         };
         match input {
             Some(command_string) => {
@@ -80,7 +79,7 @@ fn main() {
                     Incomplete(_) => panic!("Should not receive incomplete"),
                 };
                 engine.mode = engine::Mode::Normal;
-            }
+            },
             None => {
                 continue
             }
