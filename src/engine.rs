@@ -1,6 +1,5 @@
 use buffer;
 use ex;
-use std::process;
 use std::fs::File;
 use std::io::{self, Write};
 use display::IO;
@@ -37,7 +36,7 @@ impl <'a> Engine<'a> {
     pub fn execute(&mut self, command: &ex::Command) -> Result<bool, String> {
         let range = self.get_selection(&command.selector);
         match command.action {
-            ex::Action::Edit(ref filename) => self.execute_edit(range, filename),
+            ex::Action::Edit(ref filename) => self.execute_edit(filename),
             ex::Action::Write(ref filename) => self.execute_write(range, Some(filename)),
             ex::Action::Go => self.execute_go(range),
             ex::Action::Yank => self.execute_yank(range),
@@ -73,7 +72,7 @@ impl <'a> Engine<'a> {
     }
 
 
-    fn execute_edit(&mut self, range: (u64, Option<u64>), filename: &str) -> Result<bool, String> {
+    fn execute_edit(&mut self, filename: &str) -> Result<bool, String> {
         match buffer::Buffer::open(filename) {
             Ok(buffer) => {
                 self.buffer = buffer;
@@ -98,8 +97,10 @@ impl <'a> Engine<'a> {
         match File::create(filename) {
             Ok(mut fh) => {
                 for line in range.0 .. (range.1.unwrap_or((self.buffer.content.len()+1) as u64)) {
-                    fh.write_all(&self.buffer.content[line as usize].as_bytes());
-                    fh.write_all(b"\n");
+                    match fh.write_all(&self.buffer.content[line as usize].as_bytes()).and(fh.write_all(b"\n")) {
+                        Ok(_) => continue,
+                        Err(_) => return Err(format!("Error writing file, {}", filename).to_string()),
+                    }
                 }
                 Ok(true)
             },

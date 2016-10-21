@@ -3,14 +3,12 @@ extern crate rustbox;
 #[macro_use]
 extern crate nom;
 
-use std::io::Write;
 use std::thread;
 use std::time;
 
-use rustbox::Key;
 use nom::IResult::{Done, Incomplete, Error};
 
-use ex::{Action, parser};
+use ex::{parser};
 
 pub mod display;
 pub mod engine;
