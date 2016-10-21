@@ -1,5 +1,7 @@
 use buffer;
 use ex;
+use std::process;
+use std::fs::File;
 use std::io::{self, Write};
 use display::IO;
 
@@ -36,6 +38,7 @@ impl <'a> Engine<'a> {
         let range = self.get_selection(&command.selector);
         match command.action {
             ex::Action::Edit(ref filename) => self.execute_edit(range, filename),
+            ex::Action::Write(ref filename) => self.execute_write(range, Some(filename)),
             ex::Action::Go => self.execute_go(range),
             ex::Action::Yank => self.execute_yank(range),
             ex::Action::Print => self.execute_print(range),
@@ -79,6 +82,28 @@ impl <'a> Engine<'a> {
                 Ok(true)
             },
             Err(_) => Err(format!("Could not open specified file: {}", filename))
+        }
+    }
+
+    fn execute_write(&mut self, range: (u64, Option<u64>), filename: Option<&str>) -> Result<bool, String> {
+
+
+        let filename = match filename {
+            Some(filename) => filename,
+            None => match self.buffer.filename {
+                Some(ref filename) => filename,
+                None => return Err("No file specified".to_string()),
+            }
+        };
+        match File::create(filename) {
+            Ok(mut fh) => {
+                for line in range.0 .. (range.1.unwrap_or((self.buffer.content.len()+1) as u64)) {
+                    fh.write_all(&self.buffer.content[line as usize].as_bytes());
+                    fh.write_all(b"\n");
+                }
+                Ok(true)
+            },
+            Err(_) => Err(format!("Could not write to file: {}", filename))
         }
     }
 

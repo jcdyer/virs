@@ -19,14 +19,16 @@ pub struct Selector {
 
 #[derive(Debug,PartialEq)]
 pub enum Action {
-    Yank,
+    Append,
     Delete,
-    Global(Box<Action>),
     Edit(String),
+    Global(Box<Action>),
     Go,
     Print,
-    Append,
+    Put,
     Quit,
+    Write(String),
+    Yank,
 }
 
 #[derive(Debug,PartialEq)]

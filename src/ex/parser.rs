@@ -94,6 +94,9 @@ fn action_yank(input: &str) -> IResult<&str, Action> {
 fn action_print(input: &str) -> IResult<&str, Action> {
     tag_str(input, "p").map(|_| { Action::Print })
 }
+fn action_put(input: &str) -> IResult<&str, Action> {
+    tag_str(input, "put").map(|_| { Action::Put })
+}
 fn action_delete(input: &str) -> IResult<&str, Action> {
     tag_str(input, "d").map(|_| { Action::Delete })
 }
@@ -107,6 +110,13 @@ fn action_edit(input: &str) -> IResult<&str, Action> {
         Error(x) => IResult::Error(x),
     }
 }
+fn action_write(input: &str) -> IResult<&str, Action> {
+    match tag_str(input, "w") {
+        Done(input, _) => parse_filename(input).map(|filename| { Action::Write(filename) }),
+        IResult::Incomplete(x) => IResult::Incomplete(x),
+        Error(x) => IResult::Error(x),
+    }
+}
 fn action_go(input: &str) -> IResult<&str, Action> {
     eof(input).map(|_| { Action::Go })
 }
@@ -116,29 +126,7 @@ fn action_unknown(input: &str) -> IResult<&str, Action> {
 }
 
 fn parse_action(input: &str) -> IResult<&str, Action> {
-    alt!(input, action_quit|action_yank|action_print|action_delete|action_append|action_edit|action_go|action_unknown)
-
-    /*
-    match input.chars().nth(0) {
-        None => Done(input, Action::Go),
-        Some('q') => action_quit(input),
-        Some('y') => action_yank(input),
-        Some('p') => action_print(input),
-        Some('d') => action_delete(input),
-        Some('a') => action_append(input),
-        Some('e') => {
-            parse_filename(input.split_at(1).1).map(
-                |filename| { Action::Edit(filename) }
-            )
-        },
-        Some('g') => {
-            parse_action(input.split_at(1).1).map(|inner_action| {
-                Action::Global(Box::new(inner_action))
-            })
-        },
-        Some(_) => panic!("Unknown action"),  // Unknown action
-    }
-    */
+    alt!(input, action_quit|action_yank|action_put|action_print|action_delete|action_append|action_edit|action_go|action_write|action_unknown)
 }
 
 fn parse_locator(input: &str) -> IResult<&str, Locator> {
